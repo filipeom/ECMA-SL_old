@@ -113,9 +113,8 @@ module M (Instrument : Instrument.M) = struct
 
   and eval_expr (state : state) (e : Expr.t) : Val.t =
     let v = eval_expr' state e in
-    let lvl = Call_stack.level state.stack in
     Instrument.Profiler.count !(state.inst).pf `Expr;
-    Instrument.Tracer.trace_expr lvl e (state.heap, v);
+    Instrument.Tracer.trace_expr !(state.inst).tr e (state.heap, v);
     v
 
   let eval_str (state : state) (e : Expr.t) : string =
@@ -189,8 +188,7 @@ module M (Instrument : Instrument.M) = struct
     let inst = !(state.inst) in
     let lbl_f = Instrument.Monitor.update_label in
     let ( $$ ) v s_eval = lbl_f inst.mon s s_eval |> fun () -> v in
-    let lvl = Call_stack.level state.stack in
-    Instrument.Tracer.trace_stmt lvl s;
+    Instrument.Tracer.trace_stmt inst.tr s;
     Instrument.Profiler.count inst.pf `Stmt;
     match s.it with
     | Skip -> Intermediate (state, cont) $$ SkipEval
@@ -207,7 +205,7 @@ module M (Instrument : Instrument.M) = struct
     | Return e -> (
       let v = eval_expr state e in
       let f = Call_stack.func state.stack in
-      Instrument.Tracer.trace_return lvl f s (state.heap, v);
+      Instrument.Tracer.trace_return inst.tr f s (state.heap, v);
       let (frame, stack') = Call_stack.pop state.stack in
       match frame with
       | Call_stack.Toplevel _ -> Final v $$ ReturnEval
@@ -215,7 +213,7 @@ module M (Instrument : Instrument.M) = struct
         let (store', cont', x) = Call_stack.restore restore in
         let state' = { state with store = store'; stack = stack' } in
         Store.set store' x v;
-        Instrument.Tracer.trace_restore (lvl - 1) (Call_stack.func stack');
+        Instrument.Tracer.trace_restore inst.tr (Call_stack.func stack');
         Intermediate (state', cont') $$ ReturnEval )
     | Assign (x, e) ->
       Store.set state.store x.it (eval_expr state e);
@@ -236,7 +234,7 @@ module M (Instrument : Instrument.M) = struct
         let (stack'', cont'') = db_res in
         let state' = { state with store = store'; stack = stack'' } in
         Instrument.Profiler.count inst.pf `Call;
-        Instrument.Tracer.trace_call (lvl + 1) f s;
+        Instrument.Tracer.trace_call inst.tr f s;
         Intermediate (state', cont'') $$ AssignCallEval f )
     | AssignECall (x, fn, es) ->
       let vs = List.map (eval_expr state) es in
@@ -345,11 +343,12 @@ module M (Instrument : Instrument.M) = struct
       | Error v -> Error v
       | Intermediate (state', cont') -> small_step_iter p state' cont' )
 
-  let debugger_interp_callbacks () : unit =
+  let set_interp_callbacks () : unit =
     let inst = ref (Instrument.initial_state ()) in
     let heapval_pp = heapval_pp !Config.print_depth in
     let state_conv (store, heap, stack) = { store; heap; stack; inst } in
     let eval_expr state = eval_expr @@ state_conv state in
+    Instrument.Tracer.set_interp_callbacks { heapval_pp };
     Instrument.Debugger.set_interp_callbacks { heapval_pp; eval_expr }
 
   let resolve_exitval (retval : Val.t) : Val.t =
@@ -377,7 +376,7 @@ module M (Instrument : Instrument.M) = struct
     result =
     let fmain = get_func p entry.main no_region in
     let state = initial_state fmain entry.static_heap inst in
-    Instrument.Tracer.trace_restore (-1) fmain;
+    Instrument.Tracer.trace_call !(state.inst).tr fmain (Stmt.Skip @> no_region);
     Instrument.Profiler.start !(state.inst).pf;
     let return = small_step_iter p state [ Func.body fmain ] in
     Instrument.Profiler.stop !(state.inst).pf state.heap;
@@ -388,6 +387,7 @@ module M (Instrument : Instrument.M) = struct
 
   let eval_prog (entry : entry) (p : Prog.t) : result =
     let inst = ref (Instrument.initial_state ()) in
+    set_interp_callbacks ();
     let execute () = eval_instrumented entry p inst in
     let finally () = Instrument.cleanup !inst in
     Fun.protect ~finally execute

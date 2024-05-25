@@ -7,7 +7,8 @@ module type M = sig
   module Monitor : Monitor.M
 
   type t =
-    { db : Debugger.t
+    { tr : Tracer.t
+    ; db : Debugger.t
     ; pf : Profiler.t
     ; mon : Monitor.t
     }
@@ -27,13 +28,15 @@ module Default
   module Monitor = Mon
 
   type t =
-    { db : Debugger.t
+    { tr : Tracer.t
+    ; db : Debugger.t
     ; pf : Profiler.t
     ; mon : Monitor.t
     }
 
   let initial_state () : t =
-    { db = Debugger.initial_state ()
+    { tr = Tracer.initial_state ()
+    ; db = Debugger.initial_state ()
     ; pf = Profiler.initial_state ()
     ; mon = Monitor.initial_state ()
     }
