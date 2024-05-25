@@ -32,6 +32,10 @@ module InterpreterCallbacks = struct
   let eval_expr : eval_expr ref =
     let err = "debugger expression evaluator not initialized" in
     ref (fun _ _ -> Internal_error.(throw __FUNCTION__ (Custom err)))
+
+  let set (interp_callbacks : t) : unit =
+    heapval_pp := interp_callbacks.heapval_pp;
+    eval_expr := interp_callbacks.eval_expr
 end
 
 type t =
