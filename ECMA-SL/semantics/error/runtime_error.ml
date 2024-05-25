@@ -7,7 +7,7 @@ type msg =
   | Default
   | Custom of string
   | Unexpected of string
-  | UnexpectedExitVal of Val.t
+  | UnexpectedRetval of Val.t
   | Failure of string
   | UncaughtExn of string
   | OpEvalErr of string
@@ -31,7 +31,7 @@ module RuntimeErr : Error_type.ERROR_TYPE with type t = msg = struct
     | (Default, Default) -> true
     | (Custom msg1', Custom msg2') -> String.equal msg1' msg2'
     | (Unexpected msg1', Unexpected msg2') -> String.equal msg1' msg2'
-    | (UnexpectedExitVal v1, UnexpectedExitVal v2) -> Val.equal v1 v2
+    | (UnexpectedRetval v1, UnexpectedRetval v2) -> Val.equal v1 v2
     | (Failure msg1', Failure msg2') -> String.equal msg1' msg2'
     | (UncaughtExn msg1', UncaughtExn msg2') -> String.equal msg1' msg2'
     | (OpEvalErr oplbl1, OpEvalErr oplbl2) -> String.equal oplbl1 oplbl2
@@ -55,7 +55,7 @@ module RuntimeErr : Error_type.ERROR_TYPE with type t = msg = struct
     | Default -> fprintf fmt "Generic runtime error."
     | Custom msg' -> fprintf fmt "%s" msg'
     | Unexpected msg -> fprintf fmt "Unexpected %s." msg
-    | UnexpectedExitVal v -> fprintf fmt "Unexpected exit value '%a'." Val.pp v
+    | UnexpectedRetval v -> fprintf fmt "Unexpected return value '%a'." Val.pp v
     | Failure msg -> fprintf fmt "Failure %s." msg
     | UncaughtExn msg -> fprintf fmt "Uncaught exception %s." msg
     | OpEvalErr oplbl -> fprintf fmt "Exception in Operator.%s." oplbl
